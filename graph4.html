@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>中欧班列开行数量</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #chart { 
+            width: 800px;
+            height: 500px;
+            border: 1px solid #ddd;
+            margin: 0 auto;
+            position: relative;
+        }
+        .watermark {
+            position: absolute;
+            opacity: 0.1;
+            font-size: 40px;
+            color: #999;
+            pointer-events: none;
+            transform: rotate(-30deg);
+        }
+        .source {
+            text-align: right;
+            margin-top: 10px;
+            color: #666;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div id="chart"></div>
+
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script>
+        // 精确数据（根据图片提取）
+        const data = [
+            { year: "2011年", value: 17 },
+            { year: "2012年", value: 42 },
+            { year: "2013年", value: 80 },
+            { year: "2014年", value: 308 },
+            { year: "2015年", value: 815 },
+            { year: "2016年", value: 1702 },
+            { year: "2017年", value: 3673 },
+            { year: "2018年", value: 6363 },
+            { year: "2019年", value: 8225 },
+            { year: "2020年", value: 12406 },
+            { year: "2021年", value: 15183 },
+            { year: "2022年", value: 16562 },
+            { year: "2023年", value: 17523 },
+            { year: "2024年", value: 19392 }
+        ];
+
+        // 设置图表尺寸
+        const margin = { top: 40, right: 30, bottom: 70, left: 60 };
+        const width = 800 - margin.left - margin.right;
+        const height = 500 - margin.top - margin.bottom;
+
+        // 创建SVG画布
+        const svg = d3.select("#chart")
+            .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        // 创建比例尺
+        const x = d3.scaleBand()
+            .domain(data.map(d => d.year))
+            .range([0, width])
+            .padding(0.2);
+
+        const y = d3.scaleLinear()
+            .domain([0, 25000])
+            .range([height, 0]);
+
+        // 绘制柱状图
+        svg.selectAll(".bar")
+            .data(data)
+            .enter()
+            .append("rect")
+            .attr("class", "bar")
+            .attr("x", d => x(d.year))
+            .attr("y", d => y(d.value))
+            .attr("width", x.bandwidth())
+            .attr("height", d => height - y(d.value))
+            .attr("fill", "#1f77b4");
+
+        // 添加数值标签
+        svg.selectAll(".label")
+            .data(data)
+            .enter()
+            .append("text")
+            .attr("class", "label")
+            .attr("x", d => x(d.year) + x.bandwidth() / 2)
+            .attr("y", d => y(d.value) - 5)
+            .attr("text-anchor", "middle")
+            .text(d => d.value);
+
+        // 添加坐标轴
+        svg.append("g")
+            .attr("transform", `translate(0,${height})`)
+            .call(d3.axisBottom(x))
+            .selectAll("text")
+            .attr("transform", "rotate(-45)")
+            .style("text-anchor", "end")
+            .attr("dx", "-.8em")
+            .attr("dy", ".15em");
+
+        svg.append("g")
+            .call(d3.axisLeft(y).ticks(5));
+
+        // 添加标题
+        svg.append("text")
+            .attr("x", width / 2)
+            .attr("y", -10)
+            .attr("text-anchor", "middle")
+            .style("font-size", "16px")
+            .text("中欧班列全年开行数量（列）");
+    </script>
+</body>
+</html>
