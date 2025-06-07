@@ -2,18 +2,50 @@
 <html>
 <head>
     <title>地图柱状图混合可视化</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v7.4.0/ol.css">
+    <script src="https://cdn.jsdelivr.net/npm/ol@v7.4.0/dist/ol.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
-        #map { height: 800px; }
-        .bar-chart { background: rgba(255,255,255,0.9); padding: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.3); }
-        .bar { transition: height 0.3s; }
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        #map { 
+            height: 100%;
+            width: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        .bar-chart { 
+            background: rgba(255,255,255,0.9); 
+            padding: 5px; 
+            box-shadow: 0 0 10px rgba(0,0,0,0.3); 
+        }
+        .bar { 
+            transition: height 0.3s; 
+        }
+        .ol-popup {
+            position: fixed;
+            background-color: white;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #cccccc;
+            min-width: 280px;
+            z-index: 1000;
+            display: none;
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
+    <div id="popup" class="ol-popup"></div>
 
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-    <script src="https://d3js.org/d3.v7.min.js"></script>
     <script>
         // 地理坐标与数据绑定
         const countries = [
@@ -31,18 +63,13 @@
               data: [[4924.0, 6586.1], [4.7, 5.1]] }
         ];
 
-
-        // 初始化地图
-        const map = L.map('map').setView([15, 110], 3);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
         // 创建动态比例尺
         const maxTrade = d3.max(countries.flatMap(c => c.data[0]));
         const scale = d3.scaleLinear()
             .domain([0, maxTrade])
             .range([10, 40]);
 
-        // 创建柱状图生成器（精准定位版）
+        // 创建柱状图生成器
         function createBarChart(data) {
             const container = d3.create("div").classed("bar-chart", true);
             const svgWidth = 80;
@@ -53,13 +80,11 @@
                 .attr("width", svgWidth)
                 .attr("height", 100);
 
-            // 计算柱体位置
             const xPositions = [
                 (svgWidth - (barWidth*2 + barSpacing)) / 2,
                 (svgWidth - (barWidth*2 + barSpacing)) / 2 + barWidth + barSpacing
             ];
 
-            // 绘制柱状图
             svg.selectAll("rect")
                 .data(data[0])
                 .enter()
@@ -70,13 +95,13 @@
                 .attr("height", d => scale(d))
                 .attr("fill", (d,i) => i===0 ? "#1f77b4" : "#ff7f0e");
 
-            // 精准定位市场份额标注
             svg.append("text")
                 .attr("x", xPositions[0] + barWidth/2)
                 .attr("y", 85)
                 .attr("text-anchor", "middle")
                 .attr("class", "data-label")
                 .style("fill", "#1f77b4")
+                .style("font-size", "10px")
                 .text(`${data[1][0]}%`);
 
             svg.append("text")
@@ -85,25 +110,13 @@
                 .attr("text-anchor", "middle")
                 .attr("class", "data-label")
                 .style("fill", "#ff7f0e")
+                .style("font-size", "10px")
                 .text(`${data[1][1]}%`);
 
             return container.node();
         }
 
-        // 添加地图标记（保持原有代码）
-        countries.forEach(country => {
-            L.marker([country.lat, country.lng], {
-                icon: L.divIcon({
-                    className: 'dynamic-bar',
-                    html: createBarChart(country.data).outerHTML,
-                    iconSize: [80, 100]
-                })
-            })
-             .bindPopup(createPopupContent(country)) 
-            .addTo(map);
-        });
-
- // 生成弹窗内容
+        // 生成弹窗内容
         function createPopupContent(country) {
             return `
                 <div style="min-width: 180px">
@@ -129,24 +142,71 @@
             `;
         }
 
-        // 新版图例（增强版）
-        const legend = L.control({position: 'bottomright'});
-        legend.onAdd = () => {
-            const div = L.DomUtil.create('div', 'legend');
-            div.innerHTML = `
-                <h4 style="margin:5px 0">图例说明</h4>
-                <div style="display:flex; align-items:center; margin:4px 0">
-                    <div style="background:#1f77b4; width:20px; height:15px;"></div>
-                    <span style="margin-left:8px">2019年贸易额</span>
-                </div>
-                <div style="display:flex; align-items:center; margin:4px 0">
-                    <div style="background:#ff7f0e; width:20px; height:15px;"></div>
-                    <span style="margin-left:8px">2023年贸易额</span>
-                </div>
-            `;
-            return div;
-        };
-        legend.addTo(map);
+        try {
+            // 初始化地图
+            const map = new ol.Map({
+                target: 'map',
+                layers: [
+                    new ol.layer.Tile({
+                        source: new ol.source.XYZ({
+                            url: 'https://t1.tianditu.gov.cn/DataServer?T=vec_w&x={x}&y={y}&l={z}&tk=a305b8590905e815f7c7cb0f2a781e92',
+                            crossOrigin: 'anonymous'
+                        })
+                    }),
+                    new ol.layer.Tile({
+                        source: new ol.source.XYZ({
+                            url: 'https://t1.tianditu.gov.cn/DataServer?T=cva_w&x={x}&y={y}&l={z}&tk=a305b8590905e815f7c7cb0f2a781e92',
+                            crossOrigin: 'anonymous'
+                        })
+                    })
+                ],
+                view: new ol.View({
+                    center: ol.proj.fromLonLat([110, 15]),
+                    zoom: 3,
+                    projection: 'EPSG:3857'
+                }),
+                controls: [
+                    new ol.control.Zoom(),
+                    new ol.control.ScaleLine()
+                ]
+            });
+
+            // 创建弹窗元素
+            const popup = document.getElementById('popup');
+
+            // 添加柱状图标记
+            countries.forEach(country => {
+                const marker = new ol.Overlay({
+                    position: ol.proj.fromLonLat([country.lng, country.lat]),
+                    element: createBarChart(country.data),
+                    positioning: 'bottom-center'
+                });
+
+                // 添加点击事件
+                marker.getElement().addEventListener('click', (event) => {
+                    const mapElement = document.getElementById('map');
+                    const rect = mapElement.getBoundingClientRect();
+                    const markerRect = event.target.getBoundingClientRect();
+                    
+                    popup.style.display = 'block';
+                    popup.style.left = (markerRect.left - rect.left - popup.offsetWidth/2 + markerRect.width/2) + 'px';
+                    popup.style.top = (markerRect.top - rect.top - popup.offsetHeight - 10) + 'px';
+                    popup.innerHTML = createPopupContent(country);
+                });
+
+                map.addOverlay(marker);
+            });
+
+            // 点击其他地方关闭弹窗
+            map.on('click', function(evt) {
+                if (!evt.target.getElement() || !evt.target.getElement().classList.contains('bar-chart')) {
+                    popup.style.display = 'none';
+                }
+            });
+
+        } catch (error) {
+            console.error(error);
+        }
     </script>
 </body>
 </html>
